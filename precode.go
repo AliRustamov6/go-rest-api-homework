@@ -45,10 +45,10 @@ var tasks = map[string]Task{
 func getTask(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(tasks); err != nil {
-		http.Error(w, "Ошибка", http.StatusInternalServerError)
+		http.Error(w, "Ошибка ", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+
 }
 
 // postTask создает новую запись
@@ -57,9 +57,15 @@ func postTask(w http.ResponseWriter, r *http.Request) {
 
 	var newTask Task
 	if err := json.NewDecoder(r.Body).Decode(&newTask); err != nil {
-		http.Error(w, "Ошибка", http.StatusBadRequest)
+		http.Error(w, "Неверный формат данных", http.StatusBadRequest)
 		return
 	}
+	// прверка, существует ли задача с таким ID
+	if _, ok := tasks[newTask.ID]; ok {
+		http.Error(w, "Задача с таким ID уже существует", http.StatusConflict)
+		return
+	}
+
 	tasks[newTask.ID] = newTask
 	w.WriteHeader(http.StatusCreated)
 }
@@ -70,16 +76,18 @@ func getTaskID(w http.ResponseWriter, r *http.Request) {
 
 	id := chi.URLParam(r, "id")
 	task, ok := tasks[id]
-
+	// Если задача не найдена, возвращаем 400 Bad Request
 	if !ok {
-		http.Error(w, "Ошибка", http.StatusBadRequest)
+		http.Error(w, "Задача с таким ID не найдена", http.StatusBadRequest)
 		return
 	}
+
+	// если задача ненайдена, отправляем её вответ
 	if err := json.NewEncoder(w).Encode(task); err != nil {
-		http.Error(w, "Ошибка", http.StatusInternalServerError)
+		http.Error(w, "Ошибка при оброботке запроса", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+
 }
 
 // deleteTaskID удаляет задачу по ID
@@ -89,7 +97,7 @@ func deleteTaskID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
 	if _, ok := tasks[id]; !ok {
-		http.Error(w, "Ошибка", http.StatusBadRequest)
+		http.Error(w, "Задача не найдена", http.StatusBadRequest)
 		return
 	}
 	delete(tasks, id)
