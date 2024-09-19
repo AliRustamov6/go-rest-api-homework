@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -40,13 +41,78 @@ var tasks = map[string]Task{
 }
 
 // Ниже напишите обработчики для каждого эндпоинта
-// ...
+// getTask возвращает все задачи
+func getTask(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(tasks); err != nil {
+		http.Error(w, "Ошибка", http.StatusInternalServerError)
+		return
+	}
+
+}
+
+// postTask создает новую запись
+func postTask(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	var newTask Task
+	if err := json.NewDecoder(r.Body).Decode(&newTask); err != nil {
+		http.Error(w, "Неверный формат данных", http.StatusBadRequest)
+		return
+	}
+	// Парверка, существует ли задача с таким ID
+	if _, ok := tasks[newTask.ID]; ok {
+		http.Error(w, "Задача с таким ID уже существует", http.StatusBadRequest)
+		return
+	}
+
+	tasks[newTask.ID] = newTask
+	w.WriteHeader(http.StatusCreated)
+}
+
+// getTaskID добавляет задачу по ID
+func getTaskID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	id := chi.URLParam(r, "id")
+	task, ok := tasks[id]
+	// Если задача не найдена, возвращаем 400 Bad Request
+	if !ok {
+		http.Error(w, "Задача с таким ID не найдена", http.StatusBadRequest)
+		return
+	}
+
+	// Если задача ненайдена, отправляем её вответ
+	if err := json.NewEncoder(w).Encode(task); err != nil {
+		http.Error(w, "Ошибка при оброботке запроса", http.StatusInternalServerError)
+		return
+	}
+
+}
+
+// deleteTaskID удаляет задачу по ID
+func deleteTaskID(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	id := chi.URLParam(r, "id")
+
+	if _, ok := tasks[id]; !ok {
+		http.Error(w, "Задача ID не найдена", http.StatusBadRequest)
+		return
+	}
+	delete(tasks, id)
+	w.WriteHeader(http.StatusOK)
+}
 
 func main() {
 	r := chi.NewRouter()
 
 	// здесь регистрируйте ваши обработчики
 	// ...
+	r.Get("/tasks", getTask)              // получение всех задач
+	r.Post("/tasks", postTask)            // Создание новых задач
+	r.Get("/tasks/{id}", getTaskID)       // Получение задач по ID
+	r.Delete("/tasks/{id}", deleteTaskID) // Удаление задачи по ID
 
 	if err := http.ListenAndServe(":8080", r); err != nil {
 		fmt.Printf("Ошибка при запуске сервера: %s", err.Error())
